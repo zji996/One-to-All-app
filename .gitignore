@@ -1,0 +1,11 @@
+### Runtime/local directories (must not commit)
+models/
+data/
+logs/
+
+### Python virtual envs / caches
+.venv/
+__pycache__/
+**/__pycache__/
+*.py[cod]
+
