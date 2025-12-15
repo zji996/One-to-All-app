@@ -1,0 +1,34 @@
+[project]
+name = "one_to_all_api"
+version = "0.1.0"
+description = "FastAPI backend for One-to-All-app."
+readme = "README.md"
+requires-python = ">=3.12,<3.13"
+dependencies = [
+  "fastapi>=0.115.0",
+  "uvicorn[standard]>=0.30.0",
+  "celery>=5.4.0",
+  "redis>=5.0.0",
+  "python-multipart>=0.0.9",
+  "pip>=24.0",
+  "py_core",
+]
+
+[tool.uv.sources]
+py_core = { path = "../../libs/py_core", editable = true }
+
+[project.optional-dependencies]
+dev = [
+  "httpx>=0.27.0",
+  "pytest>=8.0.0",
+]
+model_download = [
+  "modelscope>=1.18.0",
+]
+
+[build-system]
+requires = ["setuptools>=70.0.0", "wheel>=0.43.0"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools]
+py-modules = ["main"]

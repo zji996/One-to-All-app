@@ -1,0 +1,20 @@
+[project]
+name = "py_core"
+version = "0.1.0"
+description = "Shared Python utilities for One-to-All-app (settings, celery, storage)."
+readme = "README.md"
+requires-python = ">=3.12,<3.13"
+dependencies = [
+  "boto3>=1.34.0",
+  "celery>=5.4.0",
+  "pydantic-settings>=2.4.0",
+  "sqlalchemy>=2.0.0",
+  "psycopg[binary]>=3.2.0",
+]
+
+[build-system]
+requires = ["hatchling>=1.25.0"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/py_core"]

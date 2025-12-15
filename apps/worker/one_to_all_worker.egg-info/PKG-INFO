@@ -1,0 +1,106 @@
+Metadata-Version: 2.4
+Name: one_to_all_worker
+Version: 0.1.0
+Summary: Celery worker for One-to-All-app.
+Requires-Python: <3.13,>=3.12
+Description-Content-Type: text/markdown
+Requires-Dist: celery>=5.4.0
+Requires-Dist: redis>=5.0.0
+Requires-Dist: pip>=24.0
+Requires-Dist: py_core
+Provides-Extra: dev
+Requires-Dist: pytest>=8.0.0; extra == "dev"
+Provides-Extra: fp8-quant
+Requires-Dist: numpy<3.0.0,>=1.26.4; extra == "fp8-quant"
+Requires-Dist: safetensors>=0.5.0; extra == "fp8-quant"
+Requires-Dist: torch; extra == "fp8-quant"
+Requires-Dist: torchvision; extra == "fp8-quant"
+Requires-Dist: tqdm>=4.66.0; extra == "fp8-quant"
+Provides-Extra: one-to-all-animation
+Requires-Dist: diffusers>=0.36.0; extra == "one-to-all-animation"
+Requires-Dist: transformers<5.0.0,>=4.45.0; extra == "one-to-all-animation"
+Requires-Dist: deepspeed>=0.15.4; extra == "one-to-all-animation"
+Requires-Dist: accelerate<1.0.0,>=0.33.0; extra == "one-to-all-animation"
+Requires-Dist: onnxruntime-gpu; extra == "one-to-all-animation"
+Requires-Dist: numpy<2.0.0,>=1.26.4; extra == "one-to-all-animation"
+Requires-Dist: opencv-python-headless<5.0.0,>=4.8.0.76; extra == "one-to-all-animation"
+Requires-Dist: imageio>=2.37.0; extra == "one-to-all-animation"
+Requires-Dist: imageio-ffmpeg>=0.6.0; extra == "one-to-all-animation"
+Requires-Dist: pillow>=10.3.0; extra == "one-to-all-animation"
+Requires-Dist: safetensors>=0.5.0; extra == "one-to-all-animation"
+Requires-Dist: einops; extra == "one-to-all-animation"
+Requires-Dist: ninja; extra == "one-to-all-animation"
+Requires-Dist: pandas; extra == "one-to-all-animation"
+Requires-Dist: decord; extra == "one-to-all-animation"
+Requires-Dist: tensorboard; extra == "one-to-all-animation"
+Requires-Dist: pytorch-lightning; extra == "one-to-all-animation"
+Requires-Dist: ipython; extra == "one-to-all-animation"
+Requires-Dist: timm; extra == "one-to-all-animation"
+Requires-Dist: pandarallel; extra == "one-to-all-animation"
+Requires-Dist: beautifulsoup4; extra == "one-to-all-animation"
+Requires-Dist: ftfy; extra == "one-to-all-animation"
+Requires-Dist: matplotlib; extra == "one-to-all-animation"
+
+# one_to_all_worker
+
+## Dev run
+
+1. Start dependencies (Redis + Postgres)
+   - `docker compose -f infra/docker-compose.dev.yml up -d redis postgres`
+
+2. Install deps
+   - `uv sync --project apps/worker`
+
+3. Start worker
+   - `uv run --project apps/worker python main.py`
+
+## Use pip (inside project venv)
+
+- `uv run --project apps/worker pip list`
+- `uv run --project apps/worker python -m pip list`
+
+## Enable One-to-All-Animation inference deps (optional)
+
+This is heavy and follows upstream requirements:
+
+- `uv sync --project apps/worker --extra one_to_all_animation`
+
+Torch / flash-attn installation should follow `third_party/One-to-All-Animation/README.md`.
+
+## One-to-All-Animation pretrained models (required for inference)
+
+Upstream inference also needs the base Wan2.1 Diffusers weights + pose preprocess checkpoints.
+
+- Download into `third_party/One-to-All-Animation/pretrained_models/`:
+  - `uv run --project apps/api scripts/download_one_to_all_animation_pretrained.py --with-wan-14b`
+
+## FP8 (E5M2) quantize checkpoints (optional)
+
+This creates a new checkpoint folder with `-FP8` suffix under `MODELS_DIR`, intended for fp8_scaled-style
+loading where `*.weight` tensors are stored as FP8 and `*.scale_weight` is added per layer.
+
+1. Install deps in worker env (uses latest PyTorch unless you pin it yourself):
+   - `uv sync --project apps/worker --extra fp8_quant`
+
+2. Quantize:
+   - `uv run --project apps/worker scripts/quantize_one_to_all_fp8.py --model 14b --dtype e5m2`
+
+Output example: `models/One-to-All-14b-FP8/`.
+Embedding-like weights (`*.embeddings.weight`, `*.patch_embedding.weight`) are skipped by default; pass
+`--no-skip-embedding-like` to include them.
+
+## Analyze FP8 compressibility (optional)
+
+This scans FP8 weights (byte-level) and reports exponent/sign+mantissa entropy (DFloat-style), to estimate
+how much additional *lossless* compression might exist in the stored FP8 bytes.
+
+- Full scan (slow on 14B): `uv run --project apps/worker scripts/analyze_one_to_all_fp8_compressibility.py --model 14b`
+- Quick sample (approx): `uv run --project apps/worker scripts/analyze_one_to_all_fp8_compressibility.py --model 14b --sample-stride 16`
+
+## Env
+
+Copy `env.example` to `.env` (do not commit `.env`).
+
+## Checkpoints
+
+Worker reads checkpoints from `MODELS_DIR/ONE_TO_ALL_MODEL_DIR` (defaults to `models/One-to-All-14b-FP8`).

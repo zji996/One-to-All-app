@@ -1,0 +1,14 @@
+fastapi>=0.115.0
+uvicorn[standard]>=0.30.0
+celery>=5.4.0
+redis>=5.0.0
+python-multipart>=0.0.9
+pip>=24.0
+py_core
+
+[dev]
+httpx>=0.27.0
+pytest>=8.0.0
+
+[model_download]
+modelscope>=1.18.0
