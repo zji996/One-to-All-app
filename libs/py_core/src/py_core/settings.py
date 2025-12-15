@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from pydantic import Field
+from pydantic import AliasChoices, Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -42,16 +42,25 @@ class Settings(BaseSettings):
         default="third_party/One-to-All-Animation", alias="ONE_TO_ALL_ANIMATION_DIR"
     )
     one_to_all_animation_runtime_dir: str = Field(
-        default="models/One-to-All-Animation",
-        alias="ONE_TO_ALL_ANIMATION_RUNTIME_DIR",
+        default="data/one_to_all_animation_runtime",
+        validation_alias=AliasChoices(
+            "ONE_TO_ALL_ANIMATION_RUNTIME_DIR",
+            "ONE_TO_ALL_RUNTIME_DIR",
+        ),
     )
     one_to_all_animation_pretrained_dir: str = Field(
-        default="models/One-to-All-Animation/pretrained_models",
-        alias="ONE_TO_ALL_ANIMATION_PRETRAINED_DIR",
+        default="models/One-to-All-14b/pretrained_models",
+        validation_alias=AliasChoices(
+            "ONE_TO_ALL_ANIMATION_PRETRAINED_DIR",
+            "ONE_TO_ALL_PRETRAINED_DIR",
+        ),
     )
     one_to_all_wan_t2v_14b_diffusers_dir: str = Field(
-        default="models/One-to-All-Animation/pretrained_models/Wan2.1-T2V-14B-Diffusers",
-        alias="WAN_T2V_14B_DIFFUSERS_DIR",
+        default="models/One-to-All-14b/pretrained_models/Wan2.1-T2V-14B-Diffusers",
+        validation_alias=AliasChoices(
+            "WAN_T2V_14B_DIFFUSERS_DIR",
+            "ONE_TO_ALL_WAN_T2V_14B_DIFFUSERS_DIR",
+        ),
     )
 
 

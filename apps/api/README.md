@@ -43,9 +43,10 @@ Copy `env.example` to `.env` (do not commit `.env`).
 
 Upstream inference also needs the base Wan2.1 Diffusers weights + pose preprocess checkpoints.
 
-- Download into `models/One-to-All-Animation/pretrained_models/`:
+- Download into `models/One-to-All-14b/pretrained_models/`:
   - `uv sync --project apps/api --extra model_download`
-  - If you already downloaded into the submodule, migrate first:
-    - `uv run --project apps/api scripts/download_one_to_all_animation_pretrained.py --move-from-third-party`
   - Download (or refresh missing files):
     - `uv run --project apps/api scripts/download_one_to_all_animation_pretrained.py --with-wan-14b`
+    - If you really need the base Wan `transformer/` weights too: add `--with-wan-transformer` (usually unnecessary)
+  - If you already have them under `models/One-to-All-Animation/pretrained_models/`, migrate:
+    - `uv run --project apps/api scripts/prepare_one_to_all_14b_model_repo.py`

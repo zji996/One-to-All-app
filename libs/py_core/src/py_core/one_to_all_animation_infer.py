@@ -97,9 +97,13 @@ def _load_fp8_scaled_state_dict(checkpoint_dir: Path, *, target_dtype) -> dict[s
     from safetensors import safe_open
     import torch
 
-    shard_paths = sorted(checkpoint_dir.glob("*.safetensors"))
-    if not shard_paths:
-        raise FileNotFoundError(f"No .safetensors shards found in: {checkpoint_dir}")
+    shard_paths: list[Path]
+    if checkpoint_dir.is_file():
+        shard_paths = [checkpoint_dir]
+    else:
+        shard_paths = sorted(checkpoint_dir.glob("*.safetensors"))
+        if not shard_paths:
+            raise FileNotFoundError(f"No .safetensors shards found in: {checkpoint_dir}")
 
     scales: dict[str, torch.Tensor] = {}
     for shard_path in shard_paths:
@@ -107,6 +111,21 @@ def _load_fp8_scaled_state_dict(checkpoint_dir: Path, *, target_dtype) -> dict[s
             for key in f.keys():
                 if key.endswith(".scale_weight"):
                     scales[key] = f.get_tensor(key)
+
+    def _apply_fp8_scale(fp8_weight: torch.Tensor, scale_weight: torch.Tensor) -> torch.Tensor:
+        if fp8_weight.ndim < 2:
+            raise ValueError(f"Expected fp8_weight.ndim>=2, got {fp8_weight.ndim} ({fp8_weight.shape})")
+        if scale_weight.ndim != 1:
+            raise ValueError(
+                f"Expected scale_weight.ndim==1, got {scale_weight.ndim} ({scale_weight.shape})"
+            )
+        if int(scale_weight.shape[0]) != int(fp8_weight.shape[0]):
+            raise ValueError(
+                "scale_weight shape mismatch: "
+                f"scale={tuple(scale_weight.shape)} weight={tuple(fp8_weight.shape)}"
+            )
+        view_shape = (int(scale_weight.shape[0]),) + (1,) * (fp8_weight.ndim - 1)
+        return fp8_weight.to(torch.float16) * scale_weight.to(torch.float16).view(view_shape)
 
     state_dict: dict[str, torch.Tensor] = {}
     fp8_dtypes = {torch.float8_e5m2, torch.float8_e4m3fn}
@@ -123,7 +142,7 @@ def _load_fp8_scaled_state_dict(checkpoint_dir: Path, *, target_dtype) -> dict[s
                         raise KeyError(
                             f"Missing scale tensor for FP8 weight: {key} (expected {scale_key})"
                         )
-                    tensor = tensor.to(torch.float16) * scale.to(torch.float16).unsqueeze(1)
+                    tensor = _apply_fp8_scale(tensor, scale)
                     tensor = tensor.to(target_dtype)
                 state_dict[key] = tensor
     return state_dict
@@ -152,7 +171,29 @@ def run_one_to_all_animation_inference(cfg: OneToAllAnimationRunConfig) -> dict[
     output_video_path = out_dir / "result.mp4"
 
     with _third_party_video_generation_context() as video_generation_dir:
-        model_path = _resolve_repo_path(settings.one_to_all_wan_t2v_14b_diffusers_dir)
+        pretrained_root_candidates = [
+            checkpoint_dir / "pretrained_models",
+            _resolve_repo_path(settings.one_to_all_animation_pretrained_dir),
+        ]
+        pretrained_root = next((p for p in pretrained_root_candidates if p.is_dir()), None)
+        if pretrained_root is None:
+            raise FileNotFoundError(
+                "Missing pretrained_models; download pretrained assets:\n"
+                "  uv run --project apps/api scripts/download_one_to_all_animation_pretrained.py --with-wan-14b\n"
+                f"tried={pretrained_root_candidates}"
+            )
+
+        model_path_candidates = [
+            pretrained_root / "Wan2.1-T2V-14B-Diffusers",
+            _resolve_repo_path(settings.one_to_all_wan_t2v_14b_diffusers_dir),
+        ]
+        model_path = next((p for p in model_path_candidates if p.is_dir()), None)
+        if model_path is None:
+            raise FileNotFoundError(
+                "Missing Wan2.1 Diffusers base model dir; download pretrained assets:\n"
+                "  uv run --project apps/api scripts/download_one_to_all_animation_pretrained.py --with-wan-14b\n"
+                f"tried={model_path_candidates}"
+            )
         if not model_path.is_dir():
             raise FileNotFoundError(
                 "Missing Wan2.1 Diffusers base model dir; download pretrained assets:\n"
@@ -160,11 +201,19 @@ def run_one_to_all_animation_inference(cfg: OneToAllAnimationRunConfig) -> dict[
                 f"expected_dir={model_path}"
             )
 
-        pretrained_root = _resolve_repo_path(settings.one_to_all_animation_pretrained_dir)
         pose2d_ckpt = pretrained_root / "process_checkpoint" / "pose2d" / "vitpose_h_wholebody.onnx"
         det_ckpt = pretrained_root / "process_checkpoint" / "det" / "yolov10m.onnx"
         dwpose_dir = pretrained_root / "DWPose"
-        if not pose2d_ckpt.is_file() or not det_ckpt.is_file():
+
+        def _onnx_checkpoint_exists(path: Path) -> bool:
+            if path.is_file():
+                return True
+            if path.is_dir():
+                # Some downloads store the checkpoint as a directory containing `end2end.onnx`.
+                return (path / "end2end.onnx").is_file()
+            return False
+
+        if not _onnx_checkpoint_exists(pose2d_ckpt) or not _onnx_checkpoint_exists(det_ckpt):
             raise FileNotFoundError(
                 "Missing pose preprocess checkpoints; download pretrained assets:\n"
                 "  uv run --project apps/api scripts/download_one_to_all_animation_pretrained.py\n"
@@ -182,27 +231,82 @@ def run_one_to_all_animation_inference(cfg: OneToAllAnimationRunConfig) -> dict[
         from PIL import Image
 
         from diffusers.schedulers import FlowMatchEulerDiscreteScheduler
-        from opensora.encoder_variants import get_text_enc
         from opensora.sample.pipeline_wanx_vhuman_tokenreplace import WanPipeline
         from opensora.model_variants.wanx_diffusers_src import (
             WanTransformer3DModel_Refextractor_2D_Controlnet_prefix,
         )
-        from opensora.vae_variants import get_vae
 
         from infer_utils import load_poses_whole_video, resizecrop
 
         # Build model/pipeline
         model_dtype = torch.bfloat16
-        vae_path = model_path / "vae"
         config_path = video_generation_dir / "configs" / "wan2.1_t2v_14b.json"
 
         scheduler = FlowMatchEulerDiscreteScheduler(
             shift=7.0, num_train_timesteps=1000, use_dynamic_shifting=False
         )
-        vae = get_vae("wanx", str(vae_path), model_dtype)
-        encoders = get_text_enc("wanx-t2v", str(model_path), model_dtype)
-        text_encoder = encoders.text_encoder
-        tokenizer = encoders.tokenizer
+        from transformers import AutoTokenizer, AutoConfig, UMT5EncoderModel
+        from diffusers.models import AutoencoderKLWan
+
+        def _has_fp8_scaled_weights(path: Path) -> bool:
+            from safetensors import safe_open
+
+            st_paths = sorted(path.glob("*.safetensors")) if path.is_dir() else [path]
+            for p in st_paths:
+                if not p.is_file():
+                    continue
+                with safe_open(str(p), framework="pt", device="cpu") as f:
+                    for k in f.keys():
+                        if k.endswith(".scale_weight"):
+                            return True
+            return False
+
+        def _load_text_encoder_and_tokenizer(wan_dir: Path):
+            tokenizer = AutoTokenizer.from_pretrained(str(wan_dir), subfolder="tokenizer")
+            te_dir = wan_dir / "text_encoder"
+            if _has_fp8_scaled_weights(te_dir):
+                te_config = AutoConfig.from_pretrained(str(wan_dir), subfolder="text_encoder")
+                text_encoder = UMT5EncoderModel(te_config)
+                te_state = _load_fp8_scaled_state_dict(te_dir, target_dtype=model_dtype)
+                missing, unexpected = text_encoder.load_state_dict(te_state, strict=False)
+                if missing:
+                    raise KeyError(
+                        f"FP8 text_encoder missing keys (count={len(missing)}), first={missing[:5]}"
+                    )
+                if unexpected:
+                    raise KeyError(
+                        f"FP8 text_encoder unexpected keys (count={len(unexpected)}), first={unexpected[:5]}"
+                    )
+                text_encoder = text_encoder.to(dtype=model_dtype)
+            else:
+                text_encoder = UMT5EncoderModel.from_pretrained(
+                    str(wan_dir), torch_dtype=model_dtype, subfolder="text_encoder"
+                )
+            text_encoder.requires_grad_(False)
+            text_encoder.eval()
+            return text_encoder, tokenizer
+
+        def _load_vae(wan_dir: Path):
+            vae_dir = wan_dir / "vae"
+            if _has_fp8_scaled_weights(vae_dir):
+                vae_config = AutoencoderKLWan.load_config(str(wan_dir), subfolder="vae")
+                vae = AutoencoderKLWan.from_config(vae_config).to(dtype=model_dtype)
+                vae_state = _load_fp8_scaled_state_dict(vae_dir, target_dtype=model_dtype)
+                missing, unexpected = vae.load_state_dict(vae_state, strict=False)
+                if missing:
+                    raise KeyError(f"FP8 VAE missing keys (count={len(missing)}), first={missing[:5]}")
+                if unexpected:
+                    raise KeyError(
+                        f"FP8 VAE unexpected keys (count={len(unexpected)}), first={unexpected[:5]}"
+                    )
+            else:
+                vae = AutoencoderKLWan.from_pretrained(str(wan_dir), torch_dtype=model_dtype, subfolder="vae")
+            vae.requires_grad_(False)
+            vae.eval()
+            return vae
+
+        text_encoder, tokenizer = _load_text_encoder_and_tokenizer(model_path)
+        vae = _load_vae(model_path)
 
         model = (
             WanTransformer3DModel_Refextractor_2D_Controlnet_prefix.from_config(
@@ -229,12 +333,44 @@ def run_one_to_all_animation_inference(cfg: OneToAllAnimationRunConfig) -> dict[
 
         pipe = WanPipeline(
             transformer=model,
-            vae=vae.vae,
+            vae=vae,
             text_encoder=text_encoder,
             tokenizer=tokenizer,
             scheduler=scheduler,
         )
-        pipe.to(device, dtype=model_dtype)
+
+        def _env_flag(name: str) -> bool:
+            v = os.environ.get(name, "").strip().lower()
+            return v in {"1", "true", "yes", "y", "on"}
+
+        def _should_enable_cpu_offload() -> bool:
+            if _env_flag("ONE_TO_ALL_DISABLE_CPU_OFFLOAD"):
+                return False
+            if _env_flag("ONE_TO_ALL_ENABLE_CPU_OFFLOAD"):
+                return True
+            try:
+                if device.startswith("cuda"):
+                    gpu_id = 0
+                    if ":" in device:
+                        gpu_id = int(device.split(":", 1)[1])
+                    total = int(torch.cuda.get_device_properties(gpu_id).total_memory)
+                    return total <= 36 * 1024**3
+            except Exception:
+                pass
+            return False
+
+        if _should_enable_cpu_offload() and hasattr(pipe, "enable_model_cpu_offload"):
+            try:
+                gpu_id = 0
+                if device.startswith("cuda") and ":" in device:
+                    gpu_id = int(device.split(":", 1)[1])
+                pipe.enable_model_cpu_offload(gpu_id=gpu_id)
+                print("[info] enabled model CPU offload")
+            except Exception as exc:
+                print(f"[warn] failed to enable model CPU offload: {exc}")
+                pipe.to(device, dtype=model_dtype)
+        else:
+            pipe.to(device, dtype=model_dtype)
 
         # Preprocess inputs (pose extraction etc.)
         ref_img_tmp = Image.open(cfg.reference_image_path).convert("RGB")

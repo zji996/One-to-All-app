@@ -3,7 +3,6 @@ from __future__ import annotations
 import argparse
 import os
 from pathlib import Path
-from shutil import move
 
 
 def _repo_root() -> Path:
@@ -72,17 +71,10 @@ def main() -> int:
     )
     parser.add_argument(
         "--target-dir",
-        default=os.environ.get("ONE_TO_ALL_ANIMATION_PRETRAINED_DIR")
-        or "models/One-to-All-Animation/pretrained_models",
-        help="Download destination directory (default: models/One-to-All-Animation/pretrained_models).",
-    )
-    parser.add_argument(
-        "--move-from-third-party",
-        action="store_true",
-        help=(
-            "If `third_party/One-to-All-Animation/pretrained_models` exists, move its contents into --target-dir "
-            "(useful if you previously downloaded assets into the submodule)."
-        ),
+        default=os.environ.get("ONE_TO_ALL_PRETRAINED_DIR")
+        or os.environ.get("ONE_TO_ALL_ANIMATION_PRETRAINED_DIR")
+        or "models/One-to-All-14b/pretrained_models",
+        help="Download destination directory (default: models/One-to-All-14b/pretrained_models).",
     )
     parser.add_argument(
         "--hf-endpoint",
@@ -97,12 +89,26 @@ def main() -> int:
     parser.add_argument(
         "--with-wan-14b",
         action="store_true",
-        help="Also download Wan-AI/Wan2.1-T2V-14B-Diffusers (very large).",
+        help=(
+            "Also download Wan-AI/Wan2.1-T2V-14B-Diffusers components needed for One-to-All "
+            "(defaults to vae/text_encoder/tokenizer/scheduler; pass --with-wan-transformer to include transformer weights)."
+        ),
     )
     parser.add_argument(
         "--with-wan-1-3b",
         action="store_true",
-        help="Also download Wan-AI/Wan2.1-T2V-1.3B-Diffusers (large).",
+        help=(
+            "Also download Wan-AI/Wan2.1-T2V-1.3B-Diffusers components "
+            "(defaults to vae/text_encoder/tokenizer/scheduler; pass --with-wan-transformer to include transformer weights)."
+        ),
+    )
+    parser.add_argument(
+        "--with-wan-transformer",
+        action="store_true",
+        help=(
+            "Also download the base Wan Diffusers `transformer/` weights. "
+            "One-to-All-14b already provides finetuned transformer weights, so this is usually not needed."
+        ),
     )
     args = parser.parse_args()
 
@@ -141,23 +147,6 @@ def main() -> int:
     target_root.mkdir(parents=True, exist_ok=True)
     print(f"[target] {target_root}")
 
-    if args.move_from_third_party:
-        source_root = repo_root / "third_party" / "One-to-All-Animation" / "pretrained_models"
-        if source_root.is_dir():
-            moved_any = False
-            for item in sorted(source_root.iterdir()):
-                dst = target_root / item.name
-                if dst.exists():
-                    continue
-                move(str(item), str(dst))
-                moved_any = True
-            if moved_any:
-                print(f"[migrate] moved contents from {source_root} -> {target_root}")
-            else:
-                print(f"[migrate] nothing to move from {source_root}")
-        else:
-            print(f"[migrate] source not found: {source_root}")
-
     # DWPose (StableAnimator)
     download_fn(
         "FrancisRing/StableAnimator",
@@ -180,10 +169,24 @@ def main() -> int:
         revision=args.revision,
     )
 
+    wan_keep_patterns = [
+        "README*",
+        "*.md",
+        "*.json",
+        ".mv",
+        ".msc",
+        "scheduler/*",
+        "tokenizer/*",
+        "text_encoder/*",
+        "vae/*",
+        "null_text_embedding.pt",
+    ]
+
     if args.with_wan_1_3b:
         download_fn(
             "Wan-AI/Wan2.1-T2V-1.3B-Diffusers",
             target_dir=(target_root / "Wan2.1-T2V-1.3B-Diffusers"),
+            allow_patterns=None if args.with_wan_transformer else wan_keep_patterns,
             revision=args.revision,
         )
 
@@ -191,6 +194,7 @@ def main() -> int:
         download_fn(
             "Wan-AI/Wan2.1-T2V-14B-Diffusers",
             target_dir=(target_root / "Wan2.1-T2V-14B-Diffusers"),
+            allow_patterns=None if args.with_wan_transformer else wan_keep_patterns,
             revision=args.revision,
         )
 
