@@ -8,7 +8,7 @@ from typing import Any
 
 from sqlalchemy import select
 
-from py_core.celery_app import celery_app
+from celery_app import celery_app
 from py_core.db import GenerationJob
 from py_core.db_session import db_session
 from py_core.one_to_all_model import resolve_one_to_all_checkpoint_dir
@@ -186,4 +186,3 @@ def run_one_to_all(self, payload: dict[str, Any]) -> dict[str, Any]:
             except Exception:
                 pass
         raise
-

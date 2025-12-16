@@ -13,8 +13,8 @@ from py_core.one_to_all_animation.pose import load_poses_whole_video, resizecrop
 from py_core.one_to_all_animation.split_plan import build_split_plan
 from py_core.one_to_all_animation.third_party import video_generation_context
 from py_core.one_to_all_animation.torch_utils import infer_default_device
-from py_core.one_to_all_model import resolve_one_to_all_checkpoint_dir
-from py_core.settings import settings
+from py_core.config.settings import settings
+from py_core.one_to_all.model import resolve_one_to_all_checkpoint_dir
 
 
 @dataclass(frozen=True)
@@ -327,4 +327,3 @@ def run_one_to_all_animation_inference(cfg: OneToAllAnimationRunConfig) -> dict[
             "output_fps": output_fps,
             "num_frames": len(frames),
         }
-

@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from celery import Celery
 
-from py_core.settings import settings
+from py_core.config.settings import settings
 
 celery_app = Celery(
     "one_to_all",

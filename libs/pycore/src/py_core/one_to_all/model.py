@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from py_core.settings import settings
+from py_core.config.settings import settings
 
 
 _MODEL_NAME_TO_DIR: dict[str, str] = {

@@ -33,8 +33,8 @@ repo_root/
 - `apps/api/`：HTTP 层（FastAPI 路由、上传处理、下发 Celery 任务、查询任务状态）。
 - `apps/worker/`：异步任务执行层（Celery worker 入口 + task 实现）。
   - 任务实现放在 `apps/worker/tasks.py`，避免 API 环境导入 worker 侧的推理依赖。
-- `libs/py_core/`：共享能力（settings、DB model/session、S3、模型目录解析、推理封装）。
-  - Celery 的通用 client 配置在 `libs/py_core/src/py_core/celery_app.py`（不再自动发现任务）。
+- `libs/pycore/`：共享能力（settings、DB model/session、S3、模型目录解析、推理封装）。
+  - Celery 的通用 client 配置在 `libs/pycore/src/py_core/workers/celery_app.py`（legacy re-export: `py_core.celery_app`）。
 
 ### third_party 策略
 

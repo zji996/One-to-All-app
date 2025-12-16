@@ -1281,7 +1281,7 @@ requires-dist = [
     { name = "pandas", marker = "extra == 'one-to-all-animation'" },
     { name = "pillow", marker = "extra == 'one-to-all-animation'", specifier = ">=10.3.0" },
     { name = "pip", specifier = ">=24.0" },
-    { name = "py-core", editable = "../../libs/py_core" },
+    { name = "py-core", editable = "../../libs/pycore" },
     { name = "pytest", marker = "extra == 'dev'", specifier = ">=8.0.0" },
     { name = "pytorch-lightning", marker = "extra == 'one-to-all-animation'" },
     { name = "redis", specifier = ">=5.0.0" },
@@ -1551,7 +1551,7 @@ wheels = [
 [[package]]
 name = "py-core"
 version = "0.1.0"
-source = { editable = "../../libs/py_core" }
+source = { editable = "../../libs/pycore" }
 dependencies = [
     { name = "boto3" },
     { name = "celery" },

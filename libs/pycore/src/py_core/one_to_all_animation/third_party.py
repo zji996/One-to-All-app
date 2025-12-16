@@ -7,7 +7,7 @@ from pathlib import Path
 from typing import Iterator
 
 from py_core.one_to_all_animation.paths import resolve_repo_path
-from py_core.settings import settings
+from py_core.config.settings import settings
 
 
 @contextmanager
@@ -32,4 +32,3 @@ def video_generation_context() -> Iterator[tuple[Path, Path]]:
     finally:
         os.chdir(old_cwd)
         sys.path[:] = old_sys_path
-

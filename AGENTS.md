@@ -57,7 +57,7 @@ repo_root/
 
 ## 3. libs/（共享代码）
 
-`libs/` 存放可复用逻辑（如 `libs/py_core`, `libs/ts_ui`）。
+`libs/` 存放可复用逻辑（如 `libs/pycore`, `libs/ts_ui`）。
 
 **引用约束：**
 *   **禁止反向引用**：libs **MUST NOT** import apps。
@@ -162,7 +162,7 @@ App 必须显式声明对 libs 的本地依赖（Editable），以支持 `import
 dependencies = [
     "fastapi",
     "boto3",  # 用于 S3 操作
-    "py_core @ {path = '../../libs/py_core', editable = true}",
+    "py_core @ {path = '../../libs/pycore', editable = true}",
 ]
 ```
 

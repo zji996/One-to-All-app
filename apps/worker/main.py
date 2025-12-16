@@ -3,6 +3,7 @@ from __future__ import annotations
 import sys
 
 from celery_app import celery_app
+import tasks  # noqa: F401
 
 
 def _has_loglevel_flag(argv: list[str]) -> bool:

@@ -12,7 +12,7 @@ dependencies = [
 ]
 
 [tool.uv.sources]
-py_core = { path = "../../libs/py_core", editable = true }
+py_core = { path = "../../libs/pycore", editable = true }
 dfloat11 = { path = "../../third_party/DFloat11", editable = true }
 
 [project.optional-dependencies]

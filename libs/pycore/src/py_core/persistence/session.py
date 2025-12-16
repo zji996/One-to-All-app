@@ -6,8 +6,8 @@ from typing import Iterator
 from sqlalchemy import create_engine
 from sqlalchemy.orm import Session, sessionmaker
 
-from py_core.db import Base
-from py_core.settings import settings
+from py_core.config.settings import settings
+from py_core.persistence.models import Base
 
 
 engine = create_engine(settings.database_url, pool_pre_ping=True)
@@ -29,4 +29,3 @@ def db_session() -> Iterator[Session]:
         raise
     finally:
         session.close()
-

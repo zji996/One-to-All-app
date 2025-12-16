@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import boto3
 
-from py_core.settings import settings
+from py_core.config.settings import settings
 
 
 def s3_is_configured() -> bool:

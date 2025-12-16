@@ -1,6 +1,8 @@
 README.md
+celery_app.py
 main.py
 pyproject.toml
+tasks.py
 one_to_all_worker.egg-info/PKG-INFO
 one_to_all_worker.egg-info/SOURCES.txt
 one_to_all_worker.egg-info/dependency_links.txt

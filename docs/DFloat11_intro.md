@@ -237,7 +237,7 @@ models/SteadyDancer-14B/
 - 当 `min_side<=256` 或 `max_short<384` 会打印 `[warn] low resolution...`
 - 会打印最终 resize（原图 -> 实际推理分辨率）与 split plan 信息
 
-代码位置：`libs/py_core/src/py_core/one_to_all_animation_infer.py`
+代码位置：`libs/pycore/src/py_core/one_to_all_animation_infer.py`
 
 ### 9.4 快速 A/B 用的 debug 开关（只用于定位，不用于最终结果）
 

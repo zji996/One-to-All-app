@@ -16,6 +16,8 @@ Requires-Dist: safetensors>=0.5.0; extra == "fp8-quant"
 Requires-Dist: torch; extra == "fp8-quant"
 Requires-Dist: torchvision; extra == "fp8-quant"
 Requires-Dist: tqdm>=4.66.0; extra == "fp8-quant"
+Provides-Extra: df11
+Requires-Dist: dfloat11[cuda12]; extra == "df11"
 Provides-Extra: one-to-all-animation
 Requires-Dist: diffusers>=0.36.0; extra == "one-to-all-animation"
 Requires-Dist: transformers<5.0.0,>=4.45.0; extra == "one-to-all-animation"
@@ -71,10 +73,15 @@ Torch / flash-attn installation should follow `third_party/One-to-All-Animation/
 
 Upstream inference also needs the base Wan2.1 Diffusers weights + pose preprocess checkpoints.
 
-- Download into `third_party/One-to-All-Animation/pretrained_models/`:
-  - `uv run --project apps/api scripts/download_one_to_all_animation_pretrained.py --with-wan-14b`
+- Download into `models/One-to-All-14b/pretrained_models/`:
+  - `uv sync --project apps/api --extra model_download`
+  - Download (or refresh missing files):
+    - `uv run --project apps/api scripts/download_one_to_all_animation_pretrained.py --with-wan-14b`
+    - If you really need the base Wan `transformer/` weights too: add `--with-wan-transformer` (usually unnecessary)
+  - If you already have them under `models/One-to-All-Animation/pretrained_models/`, migrate:
+    - `uv run --project apps/api scripts/prepare_one_to_all_14b_model_repo.py`
 
-## FP8 (E5M2) quantize checkpoints (optional)
+## FP8 (E4M3FN) quantize checkpoints (optional)
 
 This creates a new checkpoint folder with `-FP8` suffix under `MODELS_DIR`, intended for fp8_scaled-style
 loading where `*.weight` tensors are stored as FP8 and `*.scale_weight` is added per layer.
@@ -82,12 +89,13 @@ loading where `*.weight` tensors are stored as FP8 and `*.scale_weight` is added
 1. Install deps in worker env (uses latest PyTorch unless you pin it yourself):
    - `uv sync --project apps/worker --extra fp8_quant`
 
-2. Quantize:
-   - `uv run --project apps/worker scripts/quantize_one_to_all_fp8.py --model 14b --dtype e5m2`
+2. Quantize (best default, hardcoded):
+   - `uv run --project apps/worker scripts/quantize_one_to_all_fp8.py --model 14b`
 
-Output example: `models/One-to-All-14b-FP8/`.
-Embedding-like weights (`*.embeddings.weight`, `*.patch_embedding.weight`) are skipped by default; pass
-`--no-skip-embedding-like` to include them.
+This will:
+- Quantize One-to-All transformer 2D weights (skips embedding-like weights).
+- Populate `models/One-to-All-14b-FP8/pretrained_models/` from `models/One-to-All-14b/pretrained_models/`.
+- Quantize Wan Diffusers `text_encoder/` 2D weights (keeps `shared.weight` unquantized).
 
 ## Analyze FP8 compressibility (optional)
 

@@ -6,6 +6,9 @@ py_core
 [dev]
 pytest>=8.0.0
 
+[df11]
+dfloat11[cuda12]
+
 [fp8_quant]
 numpy<3.0.0,>=1.26.4
 safetensors>=0.5.0
