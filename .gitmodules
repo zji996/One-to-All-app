@@ -1,3 +1,6 @@
 [submodule "third_party/One-to-All-Animation"]
 	path = third_party/One-to-All-Animation
 	url = https://github.com/ssj9596/One-to-All-Animation
+[submodule "third_party/DFloat11"]
+	path = third_party/DFloat11
+	url = https://github.com/LeanModels/DFloat11

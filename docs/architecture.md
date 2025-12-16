@@ -26,6 +26,16 @@ repo_root/
 - App 依赖 Libs 必须使用绝对导入：`from libs.xxx import ...`。
 - 禁止 `apps/A` 横向 import `apps/B`；通用逻辑下沉到 `libs/`。
 
+### One-to-All 的推荐分层（实践）
+
+为了让依赖边界更清晰，建议按“运行时 wiring 在 apps，可复用能力在 libs”拆分：
+
+- `apps/api/`：HTTP 层（FastAPI 路由、上传处理、下发 Celery 任务、查询任务状态）。
+- `apps/worker/`：异步任务执行层（Celery worker 入口 + task 实现）。
+  - 任务实现放在 `apps/worker/tasks.py`，避免 API 环境导入 worker 侧的推理依赖。
+- `libs/py_core/`：共享能力（settings、DB model/session、S3、模型目录解析、推理封装）。
+  - Celery 的通用 client 配置在 `libs/py_core/src/py_core/celery_app.py`（不再自动发现任务）。
+
 ### third_party 策略
 
 `third_party/` 只用于保存上游代码（例如 One-to-All-Animation），保持“纯粹/只读”：
@@ -126,5 +136,8 @@ models/
 - `ONE_TO_ALL_MODEL_DIR=One-to-All-14b`（或 FP8：`One-to-All-14b-FP8`）
 - `ONE_TO_ALL_PRETRAINED_DIR=models/One-to-All-14b/pretrained_models`
 - `WAN_T2V_14B_DIFFUSERS_DIR=models/One-to-All-14b/pretrained_models/Wan2.1-T2V-14B-Diffusers`
-- `ONE_TO_ALL_RUNTIME_DIR=data/one_to_all_animation_runtime`
+- `ONE_TO_ALL_RUNTIME_DIR=data/one_to_all_animation_runtime`（仅缓存/临时工作目录，不应包含模型拷贝）
 
+如历史运行遗留了 `data/one_to_all_animation_runtime/{checkpoints,pretrained_models}`（目录或软链），可清理：
+
+- `bash scripts/clean_one_to_all_animation_runtime.sh`

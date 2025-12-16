@@ -19,7 +19,10 @@ from py_core.settings import settings
 @celery_app.task(name="one_to_all.run_one_to_all", bind=True)
 def run_one_to_all(self, payload: dict[str, Any]) -> dict[str, Any]:
     """
-    Run One-to-All-Animation inference via `third_party/One-to-All-Animation`.
+    Worker-side Celery task: run One-to-All-Animation inference.
+
+    Kept under `apps/worker/` so the API env can import `py_core.celery_app` without
+    pulling in worker-only ML extras.
     """
 
     task_id = getattr(self.request, "id", None)
@@ -58,7 +61,6 @@ def run_one_to_all(self, payload: dict[str, Any]) -> dict[str, Any]:
                 raise ValueError(f"Missing required field: {name}")
 
             if value.startswith("s3://"):
-                # s3://bucket/key -> key
                 parts = value[5:].split("/", 1)
                 if len(parts) == 2:
                     value = parts[1]
@@ -132,7 +134,6 @@ def run_one_to_all(self, payload: dict[str, Any]) -> dict[str, Any]:
         else:
             result["note"] = "S3 not configured; result is stored locally under DATA_DIR."
 
-        # Keep a tiny local metadata record for debugging.
         (job_dir / "request.json").write_text(
             json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8"
         )
@@ -185,3 +186,4 @@ def run_one_to_all(self, payload: dict[str, Any]) -> dict[str, Any]:
             except Exception:
                 pass
         raise
+

@@ -35,18 +35,30 @@ def _onnx_checkpoint_exists(path: Path) -> bool:
     return False
 
 
+def _default_model_dir() -> str:
+    env = os.environ.get("ONE_TO_ALL_14B_DIR")
+    if env:
+        return env
+    try:
+        from py_core.settings import settings
+
+        return str(Path(settings.models_dir) / settings.one_to_all_model_dir)
+    except Exception:
+        return "models/One-to-All-14b-FP8"
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(
         description=(
-            "Verify that `models/One-to-All-14b/` contains everything needed for One-to-All-Animation inference.\n\n"
+            "Verify that `models/<ONE_TO_ALL_MODEL_DIR>/` contains everything needed for One-to-All-Animation inference.\n\n"
             "Run via worker env:\n"
             "  uv run --project apps/worker scripts/verify_one_to_all_14b_model_repo.py\n"
         )
     )
     parser.add_argument(
         "--model-dir",
-        default=os.environ.get("ONE_TO_ALL_14B_DIR") or "models/One-to-All-14b",
-        help="Path to One-to-All-14b model repo dir (default: models/One-to-All-14b).",
+        default=_default_model_dir(),
+        help="Path to One-to-All model repo dir (default: MODELS_DIR/ONE_TO_ALL_MODEL_DIR).",
     )
     args = parser.parse_args()
 
@@ -57,10 +69,21 @@ def main() -> int:
     checks: list[tuple[str, bool]] = []
 
     # 1) One-to-All finetuned checkpoint weights
+    transformer_df11_dir = model_dir / "transformer_df11"
+    has_transformer_df11 = (
+        transformer_df11_dir.is_dir()
+        and (transformer_df11_dir / "config.json").is_file()
+        and any(transformer_df11_dir.glob("*.safetensors"))
+    )
     checks.append(("one_to_all_dir_exists", model_dir.is_dir()))
-    checks.append(("one_to_all_has_index", (model_dir / "model.safetensors.index.json").is_file()))
+    checks.append(
+        (
+            "one_to_all_has_index_or_df11",
+            (model_dir / "model.safetensors.index.json").is_file() or has_transformer_df11,
+        )
+    )
     checks.append(("one_to_all_has_config", (model_dir / "configuration.json").is_file()))
-    checks.append(("one_to_all_has_any_safetensors", any(model_dir.glob("*.safetensors"))))
+    checks.append(("one_to_all_has_bf16_or_df11_weights", any(model_dir.glob("*.safetensors")) or has_transformer_df11))
 
     # 2) Pretrained assets needed by upstream preprocessing + Wan base components
     pretrained_root = model_dir / "pretrained_models"
@@ -76,10 +99,25 @@ def main() -> int:
     checks.append(("pose2d_ckpt_exists", _onnx_checkpoint_exists(pose2d_ckpt)))
     checks.append(("det_ckpt_exists", _onnx_checkpoint_exists(det_ckpt)))
 
+    text_encoder_df11_dir = wan_dir / "text_encoder_df11"
+    has_text_encoder_df11 = (
+        text_encoder_df11_dir.is_dir()
+        and (text_encoder_df11_dir / "config.json").is_file()
+        and any(text_encoder_df11_dir.glob("*.safetensors"))
+    )
+
     for name in ["vae", "text_encoder", "tokenizer", "scheduler"]:
         p = wan_dir / name
         checks.append((f"wan_{name}_dir_exists", p.is_dir()))
         checks.append((f"wan_{name}_non_empty", _any_file_under(p)))
+
+    text_encoder_dir = wan_dir / "text_encoder"
+    checks.append(
+        (
+            "wan_text_encoder_has_bf16_or_df11_weights",
+            has_text_encoder_df11 or any(text_encoder_dir.glob("*.safetensors")),
+        )
+    )
 
     # If transformer exists, warn (it is huge + redundant for One-to-All-14b).
     transformer_dir = wan_dir / "transformer"

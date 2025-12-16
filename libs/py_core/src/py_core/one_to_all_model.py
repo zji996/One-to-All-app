@@ -8,6 +8,7 @@ from py_core.settings import settings
 _MODEL_NAME_TO_DIR: dict[str, str] = {
     "14b": "One-to-All-14b",
     "14b_fp8": "One-to-All-14b-FP8",
+    "14b_df11": "One-to-All-14b-DF11",
     "1.3b_1": "One-to-All-1.3b_1",
     "1.3b_2": "One-to-All-1.3b_2",
 }

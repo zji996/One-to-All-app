@@ -9,3 +9,15 @@ __pycache__/
 **/__pycache__/
 *.py[cod]
 
+### Test / lint caches
+.pytest_cache/
+**/.pytest_cache/
+.ruff_cache/
+**/.ruff_cache/
+.mypy_cache/
+**/.mypy_cache/
+.coverage
+coverage.xml
+htmlcov/
+.hypothesis/
+.ipynb_checkpoints/

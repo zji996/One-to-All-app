@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import sys
 
-from py_core.celery_app import celery_app
+from celery_app import celery_app
 
 
 def _has_loglevel_flag(argv: list[str]) -> bool:
@@ -14,4 +14,3 @@ if __name__ == "__main__":
     if not _has_loglevel_flag(sys.argv[1:]):
         argv += ["--loglevel=INFO"]
     celery_app.worker_main(argv=argv + sys.argv[1:])
-
